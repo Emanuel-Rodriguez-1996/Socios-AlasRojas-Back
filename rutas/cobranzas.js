@@ -12,6 +12,7 @@ router.get("/", async (req, res) => {
         c.mes,
         c.anio,
         c.fecha_pago,
+        c.pago,
         s.nro_socio,
         s.nombre
       FROM cobranzas c
