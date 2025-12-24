@@ -3,7 +3,7 @@ import pool from "../db.js";
 
 const router = express.Router();
 
-// 1. GET /api/cobranzas → Listar cobranzas (Ya lo tenías)
+// 1. GET /api/cobranzas → Listar cobranzas con datos del socio
 router.get("/", async (req, res) => {
   try {
     const result = await pool.query(`
@@ -25,15 +25,11 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   const { nro_socio, mes, anio, pago, fecha_pago } = req.body;
 
-  // Validación básica de campos obligatorios
   if (!nro_socio || !mes || !anio) {
     return res.status(400).json({ error: "Faltan datos obligatorios (socio, mes o año)" });
   }
 
   try {
-    // Insertamos en la tabla cobranzas
-    // La DB validará automáticamente si el nro_socio existe (FK) 
-    // y si la combinación socio-mes-año es única (UNIQUE)
     const result = await pool.query(
       `INSERT INTO cobranzas (nro_socio, mes, anio, pago, fecha_pago) 
        VALUES ($1, $2, $3, $4, $5) 
@@ -45,22 +41,45 @@ router.post("/", async (req, res) => {
       message: "Cobranza registrada con éxito",
       data: result.rows[0]
     });
-
   } catch (err) {
     console.error("Error al insertar cobranza:", err);
 
-    // Manejo de errores específicos de PostgreSQL
-    if (err.code === '23503') { // Foreign Key Violation
+    if (err.code === '23503') {
       return res.status(400).json({ error: "El número de socio no existe." });
     }
-    if (err.code === '23505') { // Unique Violation
+    if (err.code === '23505') {
       return res.status(400).json({ error: "Ya existe un registro para este socio en este mes/año." });
     }
-    if (err.code === '23514') { // Check Constraint Violation (chk_pago_fecha)
+    if (err.code === '23514') {
       return res.status(400).json({ error: "Si marca 'Pagó', debe incluir la fecha de pago." });
     }
 
     res.status(500).json({ error: "Error interno del servidor al guardar." });
+  }
+});
+
+// 3. PUT /api/cobranzas/:id → Actualizar una cobranza existente
+router.put("/:id", async (req, res) => {
+  const { id } = req.params;
+  const { pago, fecha_pago } = req.body;
+
+  try {
+    const result = await pool.query(
+      "UPDATE cobranzas SET pago = $1, fecha_pago = $2 WHERE id = $3 RETURNING *",
+      [pago, fecha_pago, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Registro no encontrado" });
+    }
+
+    res.json({ 
+      message: "Registro actualizado", 
+      data: result.rows[0] 
+    });
+  } catch (err) {
+    console.error("Error al actualizar cobranza:", err);
+    res.status(500).json({ error: "Error al actualizar" });
   }
 });
 
