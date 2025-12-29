@@ -3,28 +3,39 @@ import pool from "../db.js";
 
 const router = express.Router();
 
-// 1. GET /api/cobranzas → Listar cobranzas (Ahora incluye el monto)
+// 1. GET /api/cobranzas → Listar cobranzas
 router.get("/", async (req, res) => {
   try {
     const { limit } = req.query;
 
+    // Ajusta c.fecha_pago por c.fecha_registro si ya renombraste la columna
     let queryText = `
       SELECT
-        c.id, c.mes, c.anio, c.fecha_pago, c.pago, c.monto, c.monto
-        s.nro_socio, s.nombre
+        c.id, 
+        c.mes, 
+        c.anio, 
+        c.pago, 
+        c.monto,
+        c.fecha_pago,
+        s.nro_socio, 
+        s.nombre
       FROM cobranzas c
       JOIN socios s ON s.nro_socio = c.nro_socio
       ORDER BY c.anio DESC, c.mes DESC, c.id DESC
     `;
 
     if (limit) {
-      queryText += ` LIMIT ${parseInt(limit)}`;
+      // Usamos parámetros para evitar inyecciones y errores de sintaxis
+      queryText += ` LIMIT $1`;
+      const result = await pool.query(queryText, [parseInt(limit)]);
+      res.json(result.rows);
+    } else {
+      const result = await pool.query(queryText);
+      res.json(result.rows);
     }
-
-    const result = await pool.query(queryText);
-    res.json(result.rows);
+    
   } catch (err) {
-    console.error("Error obteniendo cobranzas:", err);
+    console.error("Error obteniendo cobranzas:", err); // Esto imprimirá el error en Render
     res.status(500).json({ error: "Error al obtener cobranzas" });
   }
 });
