@@ -10,7 +10,7 @@ router.get("/", async (req, res) => {
 
     let queryText = `
       SELECT
-        c.id, c.mes, c.anio, c.fecha_registro, c.pago, c.monto, c.monto
+        c.id, c.mes, c.anio, c.fecha_registro, c.pago, c.monto,
         s.nro_socio, s.nombre
       FROM cobranzas c
       JOIN socios s ON s.nro_socio = c.nro_socio
