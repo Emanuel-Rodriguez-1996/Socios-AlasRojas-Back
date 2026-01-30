@@ -1,4 +1,3 @@
-import "./src/cron/cierreMensual.js";
 import express from "express";
 import cors from "cors";
 
