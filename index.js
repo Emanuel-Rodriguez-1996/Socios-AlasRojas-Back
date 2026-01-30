@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import "./cron/cierreMensual.js";
 
 import sociosRouter from "./rutas/socios.js";
 import cobranzasRouter from "./rutas/cobranzas.js";
