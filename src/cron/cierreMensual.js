@@ -1,29 +1,18 @@
 import cron from "node-cron";
-import pool from "../db.js"; // tu conexión a Postgres
+import pool from "../../db.js";
 
-let yaEjecutadoEsteMes = false;
 
-// Se ejecuta todos los días 25 a las 03:00 AM
+console.log("🟢 Cron de cierre mensual cargado");
+
+// TEST: cada 2 minutos
 cron.schedule("*/2 * * * *", async () => {
-  if (yaEjecutadoEsteMes) {
-    console.log("⏭️ Cierre mensual ya ejecutado este mes");
-    return;
-  }
+  console.log("⏱️ Ejecutando cierre:", new Date().toISOString());
 
   try {
-    console.log("🚀 Ejecutando cierre mensual de cobranzas...");
-
+    console.log("🔌 Conectando a la base...");
     await pool.query("SELECT generar_cobranzas_mes_actual();");
-
-    yaEjecutadoEsteMes = true;
-    console.log("✅ Cierre mensual completado");
+    console.log("✅ Cierre ejecutado correctamente");
   } catch (err) {
-    console.error("❌ Error en cierre mensual:", err);
+    console.error("❌ Error en cierre:", err.message);
   }
-});
-
-// Reset automático cuando cambia el mes
-cron.schedule("0 0 1 * *", () => {
-  yaEjecutadoEsteMes = false;
-  console.log("🔄 Reset bandera mensual");
 });
