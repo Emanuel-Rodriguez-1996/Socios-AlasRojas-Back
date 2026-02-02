@@ -3,15 +3,23 @@ import pool from "../db.js";
 
 const router = express.Router();
 
-// 1. GET /api/cobranzas → Listar cobranzas (Ahora incluye el monto)
+// 1. GET /api/cobranzas → Listar cobranzas
 router.get("/", async (req, res) => {
   try {
     const { limit } = req.query;
 
     let queryText = `
       SELECT
-        c.id, c.mes, c.anio, c.fecha_registro, c.pago, c.monto,
-        s.nro_socio, s.nombre
+        c.id,
+        c.mes,
+        c.anio,
+        c.fecha_pago,
+        c.pago,
+        c.monto,
+        s.nro_socio,
+        s.nombre,
+        s.apellido,
+        s.tipo_pago
       FROM cobranzas c
       JOIN socios s ON s.nro_socio = c.nro_socio
       ORDER BY c.anio DESC, c.mes DESC, c.id DESC
@@ -29,41 +37,62 @@ router.get("/", async (req, res) => {
   }
 });
 
-// 2. POST /api/cobranzas → Registrar una nueva cobranza (Recibe monto)
+// 2. POST /api/cobranzas → Registrar cobro por tipo de socio
 router.post("/", async (req, res) => {
-  // Se agrega monto a la desestructuración del body
-  const { nro_socio, mes, anio, pago, fecha_pago, monto } = req.body;
-  
-  if (!nro_socio || !mes || !anio) {
+  const { nro_socio, mes, anio } = req.body;
+
+  if (!nro_socio || !anio) {
     return res.status(400).json({ error: "Faltan datos obligatorios" });
   }
-  
+
   try {
+    // Llama a la función de PostgreSQL
     const result = await pool.query(
-      `INSERT INTO cobranzas (nro_socio, mes, anio, pago, fecha_registro, monto) 
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`, // Se agregó el $6 y la columna monto
-      [nro_socio, mes, anio, pago, fecha_pago, monto] // Se agregó monto al array de valores
+      "SELECT generar_cobranza_por_tipo($1, $2, $3) AS meses_procesados",
+      [nro_socio, mes, anio]
     );
-    res.status(201).json({ message: "Éxito", data: result.rows[0] });
+
+    res.status(201).json({
+      message: "Cobranza procesada correctamente",
+      meses_procesados: result.rows[0].meses_procesados
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al guardar" });
+    console.error("Error generando cobranza:", err);
+    res.status(500).json({
+      error: "Error al generar cobranza",
+      detalle: err.message
+    });
   }
 });
 
-// 3. PUT /api/cobranzas/:id → Actualizar pago y monto
+// 3. PUT /api/cobranzas/:id → Actualizar pago y monto manualmente
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
-  const { pago, fecha_pago, monto } = req.body; // Se agrega monto aquí también
+  const { pago, fecha_pago, monto } = req.body;
+
   try {
     const result = await pool.query(
-      "UPDATE cobranzas SET pago = $1, fecha_registro = $2, monto = $3 WHERE id = $4 RETURNING *",
-      [pago, fecha_pago, monto, id] // Ahora son 4 parámetros
+      `
+      UPDATE cobranzas
+      SET pago = $1,
+          fecha_pago = $2,
+          monto = $3
+      WHERE id = $4
+      RETURNING *
+      `,
+      [pago, fecha_pago, monto, id]
     );
-    if (result.rowCount === 0) return res.status(404).json({ error: "No encontrado" });
-    res.json({ message: "Actualizado", data: result.rows[0] });
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "No encontrado" });
+    }
+
+    res.json({
+      message: "Actualizado correctamente",
+      data: result.rows[0]
+    });
   } catch (err) {
-    console.error(err);
+    console.error("Error actualizando cobranza:", err);
     res.status(500).json({ error: "Error al actualizar" });
   }
 });
