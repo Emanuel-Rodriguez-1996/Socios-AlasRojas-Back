@@ -65,16 +65,25 @@ router.post("/", async (req, res) => {
     });
   }
 
-  if (mes && (mes < 1 || mes > 12)) {
+  // Validación de período
+  const periodo = mes ? String(mes) : null;
+
+  if (
+    periodo &&
+    !(
+      ["S1", "S2"].includes(periodo) ||
+      (!isNaN(periodo) && Number(periodo) >= 1 && Number(periodo) <= 12)
+    )
+  ) {
     return res.status(400).json({
-      error: "mes debe estar entre 1 y 12"
+      error: "Periodo inválido. Use 1-12, S1 o S2"
     });
   }
 
   try {
     const result = await pool.query(
       "SELECT generar_cobranza_por_tipo($1, $2, $3) AS meses_procesados",
-      [parseInt(nro_socio), mes ? parseInt(mes) : null, parseInt(anio)]
+      [parseInt(nro_socio, 10), periodo, parseInt(anio, 10)]
     );
 
     res.status(201).json({
@@ -84,11 +93,11 @@ router.post("/", async (req, res) => {
   } catch (err) {
     console.error("Error generando cobranza:", err);
     res.status(500).json({
-      error: "Error al generar cobranza",
-      detalle: err.message
+      error: err.message || "Error al generar cobranza"
     });
   }
 });
+
 
 /*
 =================================
