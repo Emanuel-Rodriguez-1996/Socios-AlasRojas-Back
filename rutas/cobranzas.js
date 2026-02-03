@@ -3,7 +3,13 @@ import pool from "../db.js";
 
 const router = express.Router();
 
-// 1. GET /api/cobranzas → Listar cobranzas
+/*
+=================================
+1. GET /api/cobranzas
+   Lista cobranzas
+   ?limit=10 (opcional)
+=================================
+*/
 router.get("/", async (req, res) => {
   try {
     const { limit } = req.query;
@@ -13,7 +19,7 @@ router.get("/", async (req, res) => {
         c.id,
         c.mes,
         c.anio,
-        c.fecha_pago,
+        c.fecha_registro,
         c.pago,
         c.monto,
         s.nro_socio,
@@ -25,11 +31,18 @@ router.get("/", async (req, res) => {
       ORDER BY c.anio DESC, c.mes DESC, c.id DESC
     `;
 
+    const values = [];
+
     if (limit) {
-      queryText += ` LIMIT ${parseInt(limit)}`;
+      const lim = parseInt(limit, 10);
+      if (isNaN(lim) || lim <= 0) {
+        return res.status(400).json({ error: "limit debe ser un número positivo" });
+      }
+      queryText += ` LIMIT $1`;
+      values.push(lim);
     }
 
-    const result = await pool.query(queryText);
+    const result = await pool.query(queryText, values);
     res.json(result.rows);
   } catch (err) {
     console.error("Error obteniendo cobranzas:", err);
@@ -37,19 +50,31 @@ router.get("/", async (req, res) => {
   }
 });
 
-// 2. POST /api/cobranzas → Registrar cobro por tipo de socio
+/*
+=================================
+2. POST /api/cobranzas
+   Genera cobranzas según tipo de socio
+=================================
+*/
 router.post("/", async (req, res) => {
   const { nro_socio, mes, anio } = req.body;
 
   if (!nro_socio || !anio) {
-    return res.status(400).json({ error: "Faltan datos obligatorios" });
+    return res.status(400).json({
+      error: "Faltan datos obligatorios: nro_socio y anio"
+    });
+  }
+
+  if (mes && (mes < 1 || mes > 12)) {
+    return res.status(400).json({
+      error: "mes debe estar entre 1 y 12"
+    });
   }
 
   try {
-    // Llama a la función de PostgreSQL
     const result = await pool.query(
       "SELECT generar_cobranza_por_tipo($1, $2, $3) AS meses_procesados",
-      [nro_socio, mes, anio]
+      [parseInt(nro_socio), mes ? parseInt(mes) : null, parseInt(anio)]
     );
 
     res.status(201).json({
@@ -65,26 +90,42 @@ router.post("/", async (req, res) => {
   }
 });
 
-// 3. PUT /api/cobranzas/:id → Actualizar pago y monto manualmente
+/*
+=================================
+3. PUT /api/cobranzas/:id
+   Actualiza pago, fecha y monto
+=================================
+*/
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
-  const { pago, fecha_pago, monto } = req.body;
+  const { pago, fecha_registro, monto } = req.body;
+
+  if (typeof pago !== "boolean") {
+    return res.status(400).json({
+      error: "pago debe ser true o false"
+    });
+  }
 
   try {
     const result = await pool.query(
       `
       UPDATE cobranzas
       SET pago = $1,
-          fecha_pago = $2,
+          fecha_registro = $2,
           monto = $3
       WHERE id = $4
       RETURNING *
       `,
-      [pago, fecha_pago, monto, id]
+      [
+        pago,
+        fecha_registro || new Date(),
+        monto ? parseFloat(monto) : 0,
+        parseInt(id)
+      ]
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "No encontrado" });
+      return res.status(404).json({ error: "Cobranza no encontrada" });
     }
 
     res.json({
