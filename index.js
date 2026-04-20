@@ -3,7 +3,7 @@ import cors from "cors";
 
 import sociosRouter from "./rutas/socios.js";
 import cobranzasRouter from "./rutas/cobranzas.js";
-import logsRouter from "./routes/logs.js";
+import logsRouter from "./rutas/logs.js";
 
 
 
