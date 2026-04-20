@@ -5,26 +5,31 @@ import path from "path";
 const router = express.Router();
 
 // ======================
-// 🔴 ESCRIBIR LOG
+// 🔴 FUNCIÓN EXPORTADA
 // ======================
-function writeLog(data) {
-  const fecha = new Date().toISOString().slice(0, 7);
-  const logPath = path.join(process.cwd(), `logs-${fecha}.txt`);
+export function guardarLog(data) {
+  try {
+    const fecha = new Date().toISOString().slice(0, 7);
+    const logPath = path.join(process.cwd(), `logs-${fecha}.txt`);
 
-  const line = JSON.stringify({
-    ...data,
-    fecha: new Date().toISOString()
-  });
+    const line = JSON.stringify({
+      ...data,
+      fecha: new Date().toISOString()
+    });
 
-  fs.appendFileSync(logPath, line + "\n");
+    fs.appendFileSync(logPath, line + "\n");
+
+  } catch (err) {
+    console.error("Error guardando log:", err);
+  }
 }
 
 // ======================
-// 📥 ENDPOINT MANUAL (opcional debug)
+// 📥 ENDPOINT MANUAL
 // ======================
 router.post("/logs", (req, res) => {
   try {
-    writeLog(req.body);
+    guardarLog(req.body);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: "Error escribiendo log" });

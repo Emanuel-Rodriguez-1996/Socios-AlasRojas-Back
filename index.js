@@ -17,6 +17,7 @@ app.use("/api/socios", sociosRouter);
 app.use("/api/cobranzas", cobranzasRouter);
 app.use("/api/logs", logsRouter);
 
+
 // Test
 app.get("/", (req, res) => {
   res.send("✅ Socios Alas Rojas - Backend OK 🚀");
