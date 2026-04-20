@@ -18,20 +18,27 @@ router.post("/", async (req, res) => {
       [parseInt(nro_socio), mes, parseInt(anio)]
     );
 
-    // LOG ✔
-    if (operador) {
-      guardarLog({
-        operador,
-        accion: "REGISTRO_PAGO",
-        detalle: { nro_socio, mes, anio }
-      });
-    }
+    // LOG
+    guardarLog({
+      operador: operador || "Sistema",
+      accion: "REGISTRO_PAGO",
+      detalle: { nro_socio, mes, anio }
+    });
 
     res.status(201).json({
       message: "OK",
       data: result.rows[0]
     });
+
   } catch (err) {
+    console.error(err);
+
+    guardarLog({
+      operador: operador || "Sistema",
+      accion: "ERROR_PAGO",
+      detalle: { error: err.message }
+    });
+
     res.status(500).json({ error: "Error" });
   }
 });
@@ -91,19 +98,31 @@ router.put("/:id", async (req, res) => {
 
     await client.query("COMMIT");
 
-    // LOG ✔
-    if (operador) {
-      guardarLog({
-        operador,
-        accion: "ACTUALIZA_PAGO",
-        detalle: { id, pago, monto }
-      });
-    }
+    // LOG
+    guardarLog({
+      operador: operador || "Sistema",
+      accion: pago ? "PAGO_CONFIRMADO" : "PAGO_ANULADO",
+      detalle: {
+        nro_socio: data.nro_socio,
+        anio: data.anio,
+        monto
+      }
+    });
 
     res.json({ message: "OK", updated: update.rowCount });
+
   } catch (err) {
     await client.query("ROLLBACK");
+    console.error(err);
+
+    guardarLog({
+      operador: operador || "Sistema",
+      accion: "ERROR_UPDATE_PAGO",
+      detalle: { id, error: err.message }
+    });
+
     res.status(500).json({ error: "Error" });
+
   } finally {
     client.release();
   }

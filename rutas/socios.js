@@ -1,15 +1,18 @@
 import express from "express";
 import pool from "../db.js";
-import { guardarLog } from "./logs.js"; 
+import { guardarLog } from "./logs.js";
 
 const router = express.Router();
 
 // GET
 router.get("/", async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM socios ORDER BY nro_socio ASC");
+    const result = await pool.query(
+      "SELECT * FROM socios ORDER BY nro_socio ASC"
+    );
     res.json(result.rows);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Error al obtener socios" });
   }
 });
@@ -25,18 +28,24 @@ router.post("/", async (req, res) => {
       [parseInt(nro_socio), nombre, apellido, tel, tipo_pago || "mensual"]
     );
 
-    // LOG ✔
-    if (operador) {
-      guardarLog({
-        operador,
-        accion: "ALTA_SOCIO",
-        detalle: { nro_socio, nombre, apellido }
-      });
-    }
+    // LOG
+    guardarLog({
+      operador: operador || "Sistema",
+      accion: "ALTA_SOCIO",
+      detalle: { nro_socio, nombre, apellido }
+    });
 
     res.status(201).json(result.rows[0]);
+
   } catch (err) {
     console.error(err);
+
+    guardarLog({
+      operador: operador || "Sistema",
+      accion: "ERROR_ALTA_SOCIO",
+      detalle: { error: err.message }
+    });
+
     res.status(500).json({ error: "Error al crear socio" });
   }
 });
@@ -51,7 +60,10 @@ router.delete("/:nro", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    await client.query("DELETE FROM cobranzas WHERE nro_socio = $1", [nro]);
+    await client.query(
+      "DELETE FROM cobranzas WHERE nro_socio = $1",
+      [nro]
+    );
 
     const result = await client.query(
       "DELETE FROM socios WHERE nro_socio = $1",
@@ -65,19 +77,27 @@ router.delete("/:nro", async (req, res) => {
 
     await client.query("COMMIT");
 
-    // LOG ✔
-    if (operador) {
-      guardarLog({
-        operador,
-        accion: "BAJA_SOCIO",
-        detalle: { nro_socio: nro }
-      });
-    }
+    // LOG
+    guardarLog({
+      operador: operador || "Sistema",
+      accion: "BAJA_SOCIO",
+      detalle: { nro_socio: nro }
+    });
 
     res.json({ message: "Socio eliminado" });
+
   } catch (err) {
     await client.query("ROLLBACK");
+    console.error(err);
+
+    guardarLog({
+      operador: operador || "Sistema",
+      accion: "ERROR_BAJA_SOCIO",
+      detalle: { nro, error: err.message }
+    });
+
     res.status(500).json({ error: "Error en baja" });
+
   } finally {
     client.release();
   }
