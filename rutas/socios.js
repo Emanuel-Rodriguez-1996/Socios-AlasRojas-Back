@@ -1,6 +1,6 @@
 import express from "express";
 import pool from "../db.js";
-import { guardarLog } from "../logs.js"; 
+import { guardarLog } from "./logs.js"; 
 
 const router = express.Router();
 
