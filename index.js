@@ -3,6 +3,9 @@ import cors from "cors";
 
 import sociosRouter from "./rutas/socios.js";
 import cobranzasRouter from "./rutas/cobranzas.js";
+import logsRouter from "./routes/logs.js";
+
+
 
 const app = express();
 
@@ -12,6 +15,7 @@ app.use(express.json());
 // Rutas
 app.use("/api/socios", sociosRouter);
 app.use("/api/cobranzas", cobranzasRouter);
+app.use("/api/logs", logsRouter);
 
 // Test
 app.get("/", (req, res) => {
