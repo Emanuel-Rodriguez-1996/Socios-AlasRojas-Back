@@ -4,7 +4,10 @@ import { guardarLog } from "./logs.js";
 
 const router = express.Router();
 
-// POST generar cobranza
+
+// ======================
+// 📥 POST generar cobranza
+// ======================
 router.post("/", async (req, res) => {
   const { nro_socio, mes, anio, operador } = req.body;
 
@@ -18,7 +21,6 @@ router.post("/", async (req, res) => {
       [parseInt(nro_socio), mes, parseInt(anio)]
     );
 
-    // LOG
     guardarLog({
       operador: operador || "Sistema",
       accion: "REGISTRO_PAGO",
@@ -39,11 +41,45 @@ router.post("/", async (req, res) => {
       detalle: { error: err.message }
     });
 
-    res.status(500).json({ error: "Error" });
+    res.status(500).json({ error: "Error al generar cobranza" });
   }
 });
 
-// PUT update pago
+
+// ======================
+// 📤 GET todas las cobranzas
+// ======================
+router.get("/", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        c.*,
+        s.nombre,
+        s.apellido
+      FROM cobranzas c
+      LEFT JOIN socios s ON s.nro_socio = c.nro_socio
+      ORDER BY c.anio DESC, c.mes DESC, c.id DESC
+    `);
+
+    res.json(result.rows);
+
+  } catch (err) {
+    console.error(err);
+
+    guardarLog({
+      operador: "Sistema",
+      accion: "ERROR_GET_COBRANZAS",
+      detalle: { error: err.message }
+    });
+
+    res.status(500).json({ error: "Error al obtener cobranzas" });
+  }
+});
+
+
+// ======================
+// 🔄 PUT actualizar pago
+// ======================
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
   const { pago, fecha_registro, monto, operador } = req.body;
@@ -56,14 +92,14 @@ router.put("/:id", async (req, res) => {
     const base = await client.query(
       `SELECT c.*, s.tipo_pago
        FROM cobranzas c
-       JOIN socios s ON s.nro_socio = c.nro_socio
+       LEFT JOIN socios s ON s.nro_socio = c.nro_socio
        WHERE c.id = $1`,
       [id]
     );
 
     if (!base.rowCount) {
       await client.query("ROLLBACK");
-      return res.status(404).json({ error: "No existe" });
+      return res.status(404).json({ error: "No existe la cobranza" });
     }
 
     const data = base.rows[0];
@@ -83,8 +119,8 @@ router.put("/:id", async (req, res) => {
 
     const update = await client.query(
       `UPDATE cobranzas
-       SET pago=$1, fecha_registro=$2, monto=$3
-       WHERE nro_socio=$4 AND anio=$5 AND mes BETWEEN $6 AND $7`,
+       SET pago = $1, fecha_registro = $2, monto = $3
+       WHERE nro_socio = $4 AND anio = $5 AND mes BETWEEN $6 AND $7`,
       [
         pago,
         fecha_registro,
@@ -98,7 +134,6 @@ router.put("/:id", async (req, res) => {
 
     await client.query("COMMIT");
 
-    // LOG
     guardarLog({
       operador: operador || "Sistema",
       accion: pago ? "PAGO_CONFIRMADO" : "PAGO_ANULADO",
@@ -109,7 +144,10 @@ router.put("/:id", async (req, res) => {
       }
     });
 
-    res.json({ message: "OK", updated: update.rowCount });
+    res.json({
+      message: "OK",
+      updated: update.rowCount
+    });
 
   } catch (err) {
     await client.query("ROLLBACK");
@@ -121,11 +159,12 @@ router.put("/:id", async (req, res) => {
       detalle: { id, error: err.message }
     });
 
-    res.status(500).json({ error: "Error" });
+    res.status(500).json({ error: "Error al actualizar pago" });
 
   } finally {
     client.release();
   }
 });
+
 
 export default router;
